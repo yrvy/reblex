@@ -9,6 +9,9 @@ description = "A Python Roblox Launcher"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
+dependencies = [
+    "aiohttp>=3.9.0",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -23,10 +26,10 @@ classifiers = [
 ]
 
 [project.scripts]
-reblex = "main:main"
+reblex = "reblex.cli:main"
 
 [project.urls]
-"Homepage" = "https://github.com/yrvy/reblex"
+Homepage = "https://github.com/yrvy/reblex"
 
 [tool.setuptools.packages.find]
-include = ["roblox_launcher*"]
+include = ["reblex*"]

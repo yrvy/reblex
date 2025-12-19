@@ -1,2 +1,1 @@
-# Reblex - Python Roblox Launcher
-# No external dependencies required - uses only Python standard library
+aiohttp>=3.9.0

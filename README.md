@@ -1,96 +1,134 @@
 # Reblex
 
-A Python Roblox launcher that handles `roblox-player://` protocol URLs directly, without needing the official Roblox bootstrapper.
+A Python Roblox launcher that handles authentication, game joining, and player launching through the Roblox API.
+
+Inspired by [voxel](https://github.com/6E6B/voxel).
 
 ## Features
 
-- Launch Roblox games from protocol URLs (`roblox-player://`)
-- Auto-detect Roblox installation
-- Register as the default protocol handler
-- Launch specific places by ID
-- Support for Roblox Studio
-
-## Requirements
-
-- Python 3.10+
-- Windows (for Roblox client)
-- Roblox installed
+- **Authentication**: Login with your `.ROBLOSECURITY` cookie
+- **Game Info**: Fetch game details (name, players, visits, etc.)
+- **Server Browser**: List available servers with player counts
+- **Game Launching**: Join games via the Roblox API with proper auth tickets
+- **Async**: Built on `aiohttp` for efficient API calls
 
 ## Installation
 
 ```bash
-git clone https://github.com/yrvy/reblex.git
-cd reblex
 pip install -e .
+```
+
+Or with requirements:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## Usage
 
-### Command Line
+### CLI
 
 ```bash
-# Show installation info
-python main.py --info
+# Login (saves cookie to ~/.reblex/cookie)
+reblex login
 
-# Launch from a protocol URL
-python main.py "roblox-player:1+launchmode:play+gameinfo:TOKEN..."
+# Or login with cookie directly
+reblex login "YOUR_ROBLOSECURITY_COOKIE"
 
-# Launch a specific place
-python main.py --place 123456789
+# Show current user
+reblex whoami
 
-# Register as protocol handler
-python main.py --register
+# Get game info
+reblex info 123456789
 
-# Unregister protocol handler
-python main.py --unregister
+# List servers
+reblex servers 123456789
+reblex servers 123456789 --limit 25
+
+# Launch game (joins any server)
+reblex launch 123456789
+
+# Join specific server by Job ID
+reblex launch 123456789 --server "abc123-job-id"
+
+# Join server by index (0 = most players)
+reblex join-server 123456789 0
 ```
 
 ### As a Library
 
 ```python
-from roblox_launcher import RobloxLauncher, parse_roblox_url
+import asyncio
+from reblex import RobloxClient, RobloxLauncher
 
-# Create launcher
-launcher = RobloxLauncher()
+async def main():
+    cookie = "your_.ROBLOSECURITY_cookie"
 
-# Check if Roblox is available
-if launcher.is_available:
-    print(f"Roblox found at: {launcher.player_path}")
+    async with RobloxClient(cookie) as client:
+        # Get authenticated user
+        user = await client.get_user()
+        print(f"Logged in as {user.username}")
 
-# Launch from URL
-result = launcher.launch_url("roblox-player:1+launchmode:play+...")
-if result.success:
-    print("Launched!")
+        # Get game info
+        game = await client.get_game_info(123456789)
+        print(f"Game: {game.name} ({game.playing} playing)")
 
-# Launch a specific place
-result = launcher.launch_place("123456789")
+        # List servers
+        servers = await client.get_servers(123456789, limit=10)
+        for server in servers:
+            print(f"Server {server.job_id}: {server.playing} players")
 
-# Parse URL parameters
-params = parse_roblox_url("roblox-player:1+launchmode:play+placeid:123")
-print(f"Place ID: {params.place_id}")
-print(f"Launch mode: {params.launch_mode}")
+        # Launch a game
+        launcher = RobloxLauncher(client)
+        result = await launcher.launch(123456789)
+        print(result.message)
+
+asyncio.run(main())
 ```
+
+## How It Works
+
+1. **Authentication**: Uses your `.ROBLOSECURITY` cookie to authenticate with Roblox
+2. **CSRF Token**: Fetches CSRF token from `auth.roblox.com` (required for POST requests)
+3. **Auth Ticket**: Gets an authentication ticket from `auth.roblox.com/v1/authentication-ticket`
+4. **Launch URL**: Builds a `roblox-player://` protocol URL with the auth ticket
+5. **Player Launch**: Opens the URL via OS protocol handler or direct exe launch
+
+## API Endpoints Used
+
+| Purpose | Endpoint |
+|---------|----------|
+| CSRF Token | `auth.roblox.com/v2/login` (403 response) |
+| Auth Ticket | `auth.roblox.com/v1/authentication-ticket` |
+| User Info | `users.roblox.com/v1/users/authenticated` |
+| Universe ID | `apis.roblox.com/universes/v1/places/{id}/universe` |
+| Game Info | `games.roblox.com/v1/games?universeIds={id}` |
+| Servers | `games.roblox.com/v1/games/{id}/servers/Public` |
+| Join Game | `gamejoin.roblox.com/v1/join-game` |
 
 ## Project Structure
 
 ```
 reblex/
-├── main.py                  # CLI entry point
-├── roblox_launcher/
-│   ├── __init__.py          # Package exports
-│   ├── launcher.py          # Main launcher classes
-│   ├── protocol.py          # URL parsing
-│   ├── finder.py            # Roblox installation detection
-│   └── register.py          # Protocol handler registration
-├── pyproject.toml           # Package configuration
-└── README.md
+├── main.py              # Entry point
+├── reblex/
+│   ├── __init__.py      # Package exports
+│   ├── http.py          # HTTP client with CSRF handling
+│   ├── auth.py          # Authentication service
+│   ├── games.py         # Game info & servers
+│   ├── client.py        # Main client wrapper
+│   ├── launcher.py      # Player launcher
+│   └── cli.py           # Command-line interface
+├── pyproject.toml
+└── requirements.txt
 ```
 
-## How It Works
+## Requirements
 
-1. **URL Parsing**: Parses `roblox-player://` URLs into structured parameters
-2. **Roblox Detection**: Finds the Roblox installation in `%LOCALAPPDATA%\Roblox\Versions`
-3. **Process Launch**: Spawns `RobloxPlayerBeta.exe` with the appropriate command-line arguments
+- Python 3.10+
+- Windows (for launching Roblox)
+- Roblox installed
+- Valid `.ROBLOSECURITY` cookie
 
 ## License
 
