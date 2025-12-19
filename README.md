@@ -1,134 +1,104 @@
 # Reblex
 
-A Python Roblox launcher that handles authentication, game joining, and player launching through the Roblox API.
+A Python Roblox launcher with a modern GUI, built with pywebview + React.
 
-Inspired by [voxel](https://github.com/6E6B/voxel).
+Inspired by [voxel](https://github.com/6E6B/voxel) and [rolauncher](https://github.com/miukyo/rolauncher).
+
+![Screenshot](screenshot.png)
 
 ## Features
 
+- **Modern UI**: Clean, dark-themed interface built with React + Tailwind
 - **Authentication**: Login with your `.ROBLOSECURITY` cookie
-- **Game Info**: Fetch game details (name, players, visits, etc.)
-- **Server Browser**: List available servers with player counts
-- **Game Launching**: Join games via the Roblox API with proper auth tickets
-- **Async**: Built on `aiohttp` for efficient API calls
+- **Game Search**: Search games by Place ID
+- **Server Browser**: View and join specific servers
+- **Game Launching**: Launch games with proper auth tickets
 
 ## Installation
 
-```bash
-pip install -e .
-```
-
-Or with requirements:
+### 1. Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
-
-### CLI
+### 2. Install frontend dependencies and build
 
 ```bash
-# Login (saves cookie to ~/.reblex/cookie)
-reblex login
-
-# Or login with cookie directly
-reblex login "YOUR_ROBLOSECURITY_COOKIE"
-
-# Show current user
-reblex whoami
-
-# Get game info
-reblex info 123456789
-
-# List servers
-reblex servers 123456789
-reblex servers 123456789 --limit 25
-
-# Launch game (joins any server)
-reblex launch 123456789
-
-# Join specific server by Job ID
-reblex launch 123456789 --server "abc123-job-id"
-
-# Join server by index (0 = most players)
-reblex join-server 123456789 0
+cd frontend
+npm install
+npm run build
+cd ..
 ```
 
-### As a Library
+### 3. Run the app
 
-```python
-import asyncio
-from reblex import RobloxClient, RobloxLauncher
-
-async def main():
-    cookie = "your_.ROBLOSECURITY_cookie"
-
-    async with RobloxClient(cookie) as client:
-        # Get authenticated user
-        user = await client.get_user()
-        print(f"Logged in as {user.username}")
-
-        # Get game info
-        game = await client.get_game_info(123456789)
-        print(f"Game: {game.name} ({game.playing} playing)")
-
-        # List servers
-        servers = await client.get_servers(123456789, limit=10)
-        for server in servers:
-            print(f"Server {server.job_id}: {server.playing} players")
-
-        # Launch a game
-        launcher = RobloxLauncher(client)
-        result = await launcher.launch(123456789)
-        print(result.message)
-
-asyncio.run(main())
+```bash
+python backend/main.py
 ```
 
-## How It Works
+Or install and run:
 
-1. **Authentication**: Uses your `.ROBLOSECURITY` cookie to authenticate with Roblox
-2. **CSRF Token**: Fetches CSRF token from `auth.roblox.com` (required for POST requests)
-3. **Auth Ticket**: Gets an authentication ticket from `auth.roblox.com/v1/authentication-ticket`
-4. **Launch URL**: Builds a `roblox-player://` protocol URL with the auth ticket
-5. **Player Launch**: Opens the URL via OS protocol handler or direct exe launch
+```bash
+pip install -e .
+reblex
+```
 
-## API Endpoints Used
+## Development
 
-| Purpose | Endpoint |
-|---------|----------|
-| CSRF Token | `auth.roblox.com/v2/login` (403 response) |
-| Auth Ticket | `auth.roblox.com/v1/authentication-ticket` |
-| User Info | `users.roblox.com/v1/users/authenticated` |
-| Universe ID | `apis.roblox.com/universes/v1/places/{id}/universe` |
-| Game Info | `games.roblox.com/v1/games?universeIds={id}` |
-| Servers | `games.roblox.com/v1/games/{id}/servers/Public` |
-| Join Game | `gamejoin.roblox.com/v1/join-game` |
+Run frontend dev server and backend in dev mode:
+
+```bash
+# Terminal 1: Frontend
+cd frontend
+npm run dev
+
+# Terminal 2: Backend (with DEV=1 to connect to Vite dev server)
+set DEV=1  # Windows
+export DEV=1  # Linux/Mac
+python backend/main.py
+```
 
 ## Project Structure
 
 ```
 reblex/
-├── main.py              # Entry point
-├── reblex/
-│   ├── __init__.py      # Package exports
-│   ├── http.py          # HTTP client with CSRF handling
-│   ├── auth.py          # Authentication service
-│   ├── games.py         # Game info & servers
-│   ├── client.py        # Main client wrapper
-│   ├── launcher.py      # Player launcher
-│   └── cli.py           # Command-line interface
+├── backend/
+│   ├── main.py              # Pywebview app entry point
+│   └── reblex/              # Python Roblox API client
+│       ├── http.py          # HTTP client with CSRF handling
+│       ├── auth.py          # Authentication service
+│       ├── games.py         # Game info & servers
+│       ├── client.py        # Main client wrapper
+│       └── launcher.py      # Player launcher
+├── frontend/
+│   ├── src/
+│   │   ├── App.tsx          # Main React app
+│   │   ├── api.ts           # Pywebview API bridge
+│   │   └── pages/           # UI pages
+│   ├── package.json
+│   └── vite.config.ts
 ├── pyproject.toml
 └── requirements.txt
 ```
 
+## How It Works
+
+1. **Pywebview**: Creates a native window with an embedded web view
+2. **React Frontend**: Modern UI that calls Python methods via `window.pywebview.api`
+3. **Python Backend**: Handles Roblox API calls:
+   - CSRF token from `auth.roblox.com`
+   - Auth ticket from `auth.roblox.com/v1/authentication-ticket`
+   - Game info from `games.roblox.com`
+   - Server list from `games.roblox.com/v1/games/{id}/servers/Public`
+4. **Launch**: Builds `roblox-player://` URL and opens via system handler
+
 ## Requirements
 
 - Python 3.10+
+- Node.js 18+ (for building frontend)
 - Windows (for launching Roblox)
 - Roblox installed
-- Valid `.ROBLOSECURITY` cookie
 
 ## License
 

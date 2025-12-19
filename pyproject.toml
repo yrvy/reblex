@@ -5,16 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reblex"
 version = "1.0.0"
-description = "A Python Roblox Launcher"
+description = "A Python Roblox Launcher with GUI"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 dependencies = [
     "aiohttp>=3.9.0",
+    "pywebview>=5.0.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "Environment :: Console",
+    "Environment :: X11 Applications",
+    "Environment :: Win32 (MS Windows)",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
     "Operating System :: Microsoft :: Windows",
@@ -26,10 +28,10 @@ classifiers = [
 ]
 
 [project.scripts]
-reblex = "reblex.cli:main"
+reblex = "backend.main:main"
 
 [project.urls]
 Homepage = "https://github.com/yrvy/reblex"
 
 [tool.setuptools.packages.find]
-include = ["reblex*"]
+include = ["backend*"]
