@@ -7,6 +7,8 @@ from typing import Optional
 from .http import RobloxHTTP
 from .auth import RobloxAuth, AuthenticatedUser
 from .games import RobloxGames, GameInfo, GameServer
+from .discovery import RobloxDiscovery, HomeGame
+from .friends import RobloxFriends, Friend
 
 
 class RobloxClient:
@@ -20,9 +22,13 @@ class RobloxClient:
             user = await client.get_user()
             print(f"Logged in as {user.username}")
 
-            servers = await client.get_servers(place_id)
-            for server in servers:
-                print(f"Server {server.job_id}: {server.playing} players")
+            # Get home feed
+            recommendations = await client.discovery.get_home_recommendations()
+            continue_playing = await client.discovery.get_continue_playing()
+            favorites = await client.discovery.get_favorites()
+
+            # Get friends
+            friends = await client.friends.get_friends(user.user_id)
     """
 
     def __init__(self, cookie: Optional[str] = None):
@@ -35,6 +41,8 @@ class RobloxClient:
         self._http = RobloxHTTP(cookie)
         self._auth = RobloxAuth(self._http)
         self._games = RobloxGames(self._http)
+        self._discovery = RobloxDiscovery(self._http)
+        self._friends = RobloxFriends(self._http)
         self._user: Optional[AuthenticatedUser] = None
 
     async def __aenter__(self):
@@ -56,6 +64,16 @@ class RobloxClient:
     def games(self) -> RobloxGames:
         """Access the games service."""
         return self._games
+
+    @property
+    def discovery(self) -> RobloxDiscovery:
+        """Access the discovery/home feed service."""
+        return self._discovery
+
+    @property
+    def friends(self) -> RobloxFriends:
+        """Access the friends service."""
+        return self._friends
 
     def set_cookie(self, cookie: str):
         """Set the authentication cookie."""
@@ -102,3 +120,35 @@ class RobloxClient:
         Returns the join response which contains connection info.
         """
         return await self._games.join_game(place_id, job_id)
+
+    async def get_user_avatar(self, user_id: int, size: str = "420x420") -> Optional[str]:
+        """Get avatar URL for a user."""
+        resp = await self._http.get(
+            f"https://thumbnails.roblox.com/v1/users/avatar"
+            f"?userIds={user_id}&size={size}&format=Webp&isCircular=false"
+        )
+
+        if resp.status != 200 or not resp.data:
+            return None
+
+        data = resp.data.get("data", [])
+        if data and data[0].get("imageUrl"):
+            return data[0]["imageUrl"]
+
+        return None
+
+    async def get_user_headshot(self, user_id: int, size: str = "150x150") -> Optional[str]:
+        """Get headshot avatar URL for a user."""
+        resp = await self._http.get(
+            f"https://thumbnails.roblox.com/v1/users/avatar-headshot"
+            f"?userIds={user_id}&size={size}&format=Webp&isCircular=false"
+        )
+
+        if resp.status != 200 or not resp.data:
+            return None
+
+        data = resp.data.get("data", [])
+        if data and data[0].get("imageUrl"):
+            return data[0]["imageUrl"]
+
+        return None

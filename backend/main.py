@@ -8,7 +8,6 @@ import os
 import sys
 import webview
 import asyncio
-import threading
 from pathlib import Path
 
 # Add backend to path
@@ -16,7 +15,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from reblex.client import RobloxClient
 from reblex.launcher import RobloxLauncher
-from reblex.games import GameInfo, GameServer
 
 
 def get_cookie_path() -> Path:
@@ -62,6 +60,7 @@ class Api:
         self._client: RobloxClient | None = None
         self._launcher: RobloxLauncher | None = None
         self._cookie: str | None = load_cookie()
+        self._user_id: int | None = None
 
         # Auto-login if we have a saved cookie
         if self._cookie:
@@ -80,17 +79,11 @@ class Api:
         return self._cookie is not None and self._client is not None
 
     def login(self, cookie: str) -> dict:
-        """
-        Login with a .ROBLOSECURITY cookie.
-
-        Returns: {"success": bool, "user": {...} | None, "error": str | None}
-        """
-        # Clean up cookie
+        """Login with a .ROBLOSECURITY cookie."""
         cookie = cookie.strip()
         if cookie.startswith(".ROBLOSECURITY="):
             cookie = cookie[15:]
 
-        # Try to authenticate
         self._cookie = cookie
         self._init_client()
 
@@ -98,32 +91,27 @@ class Api:
             try:
                 user = await self._client.get_user()
                 if user:
+                    self._user_id = user.user_id
                     save_cookie(cookie)
+                    avatar = await self._client.get_user_headshot(user.user_id)
                     return {
                         "success": True,
                         "user": {
                             "id": user.user_id,
                             "username": user.username,
                             "displayName": user.display_name,
+                            "avatar": avatar,
                         },
                         "error": None
                     }
                 else:
                     self._cookie = None
                     self._client = None
-                    return {
-                        "success": False,
-                        "user": None,
-                        "error": "Invalid cookie"
-                    }
+                    return {"success": False, "user": None, "error": "Invalid cookie"}
             except Exception as e:
                 self._cookie = None
                 self._client = None
-                return {
-                    "success": False,
-                    "user": None,
-                    "error": str(e)
-                }
+                return {"success": False, "user": None, "error": str(e)}
 
         return run_async(do_login())
 
@@ -132,6 +120,7 @@ class Api:
         self._cookie = None
         self._client = None
         self._launcher = None
+        self._user_id = None
 
         path = get_cookie_path()
         if path.exists():
@@ -146,14 +135,132 @@ class Api:
             try:
                 user = await self._client.get_user()
                 if user:
+                    self._user_id = user.user_id
+                    avatar = await self._client.get_user_headshot(user.user_id)
                     return {
                         "id": user.user_id,
                         "username": user.username,
                         "displayName": user.display_name,
+                        "avatar": avatar,
                     }
             except:
                 pass
             return None
+
+        return run_async(fetch())
+
+    # ============== Home Feed Methods ==============
+
+    def get_home_feed(self) -> dict:
+        """Get the home page feed with recommendations, continue, favorites."""
+        if not self._client:
+            return {"friends": [], "continue": [], "favorites": [], "recommended": []}
+
+        async def fetch():
+            try:
+                # Fetch all in parallel-ish
+                continue_games = await self._client.discovery.get_continue_playing()
+                favorites = await self._client.discovery.get_favorites()
+                friends = []
+
+                if self._user_id:
+                    friends = await self._client.friends.get_friends(self._user_id, limit=20)
+
+                return {
+                    "friends": [
+                        {
+                            "id": f.user_id,
+                            "username": f.username,
+                            "displayName": f.display_name,
+                            "avatar": f.avatar_url,
+                            "status": f.presence.status,
+                            "gameName": f.presence.game_name,
+                            "placeId": f.presence.place_id,
+                            "jobId": f.presence.job_id,
+                        }
+                        for f in friends
+                    ],
+                    "continue": [
+                        {
+                            "universeId": g.universe_id,
+                            "placeId": g.place_id,
+                            "name": g.name,
+                            "playerCount": g.player_count,
+                            "upvotes": g.total_upvotes,
+                            "downvotes": g.total_downvotes,
+                            "thumbnail": g.thumbnail_url,
+                            "icon": g.icon_url,
+                        }
+                        for g in continue_games[:6]
+                    ],
+                    "favorites": [
+                        {
+                            "universeId": g.universe_id,
+                            "placeId": g.place_id,
+                            "name": g.name,
+                            "playerCount": g.player_count,
+                            "upvotes": g.total_upvotes,
+                            "downvotes": g.total_downvotes,
+                            "thumbnail": g.thumbnail_url,
+                            "icon": g.icon_url,
+                        }
+                        for g in favorites[:6]
+                    ],
+                }
+            except Exception as e:
+                print(f"Error fetching home feed: {e}")
+                return {"friends": [], "continue": [], "favorites": [], "error": str(e)}
+
+        return run_async(fetch())
+
+    def get_friends(self, limit: int = 20) -> list:
+        """Get friends with presence."""
+        if not self._client or not self._user_id:
+            return []
+
+        async def fetch():
+            try:
+                friends = await self._client.friends.get_friends(self._user_id, limit=limit)
+                return [
+                    {
+                        "id": f.user_id,
+                        "username": f.username,
+                        "displayName": f.display_name,
+                        "avatar": f.avatar_url,
+                        "status": f.presence.status,
+                        "gameName": f.presence.game_name,
+                        "placeId": f.presence.place_id,
+                        "jobId": f.presence.job_id,
+                    }
+                    for f in friends
+                ]
+            except:
+                return []
+
+        return run_async(fetch())
+
+    def search_games(self, query: str) -> list:
+        """Search for games."""
+        if not self._client:
+            return []
+
+        async def fetch():
+            try:
+                games = await self._client.discovery.search_games(query, limit=12)
+                return [
+                    {
+                        "universeId": g.universe_id,
+                        "placeId": g.place_id,
+                        "name": g.name,
+                        "playerCount": g.player_count,
+                        "upvotes": g.total_upvotes,
+                        "downvotes": g.total_downvotes,
+                        "thumbnail": g.thumbnail_url,
+                    }
+                    for g in games
+                ]
+            except:
+                return []
 
         return run_async(fetch())
 
@@ -206,73 +313,40 @@ class Api:
                     for s in servers
                 ]
             except:
-                pass
-            return []
+                return []
 
         return run_async(fetch())
 
     def launch_game(self, place_id: int, job_id: str | None = None) -> dict:
-        """
-        Launch a Roblox game.
-
-        Returns: {"success": bool, "message": str}
-        """
+        """Launch a Roblox game."""
         if not self._client or not self._launcher:
             return {"success": False, "message": "Not logged in"}
 
         async def do_launch():
             try:
                 result = await self._launcher.launch(place_id, job_id=job_id)
-                return {
-                    "success": result.success,
-                    "message": result.message
-                }
+                return {"success": result.success, "message": result.message}
             except Exception as e:
-                return {
-                    "success": False,
-                    "message": str(e)
-                }
+                return {"success": False, "message": str(e)}
 
         return run_async(do_launch())
 
     # ============== Utility Methods ==============
-
-    def get_roblox_path(self) -> str | None:
-        """Get path to Roblox player executable."""
-        path = RobloxLauncher.find_roblox_player()
-        return str(path) if path else None
 
     def is_roblox_installed(self) -> bool:
         """Check if Roblox is installed."""
         return RobloxLauncher.find_roblox_player() is not None
 
 
-def get_frontend_url() -> str:
-    """Get the URL for the frontend."""
-    # Check if running in development mode
-    if os.environ.get("DEV"):
-        return "http://localhost:5173"
-
-    # Production: load from built files
-    frontend_path = Path(__file__).parent.parent / "frontend" / "dist" / "index.html"
-    if frontend_path.exists():
-        return f"file://{frontend_path}"
-
-    # Fallback: try relative path
-    return "frontend/dist/index.html"
-
-
 def main():
     """Main entry point."""
     api = Api()
 
-    # Check if dev mode
     is_dev = os.environ.get("DEV", "").lower() in ("1", "true", "yes")
 
     if is_dev:
         url = "http://localhost:5173"
     else:
-        # Look for built frontend
         dist_path = Path(__file__).parent.parent / "frontend" / "dist" / "index.html"
         if dist_path.exists():
             url = str(dist_path)
@@ -285,9 +359,9 @@ def main():
         title="Reblex",
         url=url,
         js_api=api,
-        width=1000,
-        height=700,
-        min_size=(800, 600),
+        width=1200,
+        height=800,
+        min_size=(900, 600),
         background_color="#0f0f0f",
     )
 

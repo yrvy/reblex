@@ -4,6 +4,36 @@ export interface User {
   id: number;
   username: string;
   displayName: string;
+  avatar?: string;
+}
+
+export interface Friend {
+  id: number;
+  username: string;
+  displayName: string;
+  avatar?: string;
+  status: 'offline' | 'online' | 'ingame' | 'studio';
+  gameName?: string;
+  placeId?: number;
+  jobId?: string;
+}
+
+export interface HomeGame {
+  universeId: number;
+  placeId: number;
+  name: string;
+  playerCount: number;
+  upvotes: number;
+  downvotes: number;
+  thumbnail?: string;
+  icon?: string;
+}
+
+export interface HomeFeed {
+  friends: Friend[];
+  continue: HomeGame[];
+  favorites: HomeGame[];
+  error?: string;
 }
 
 export interface GameInfo {
@@ -47,13 +77,17 @@ export interface PyWebviewApi {
   logout(): Promise<void>;
   get_current_user(): Promise<User | null>;
 
+  // Home Feed
+  get_home_feed(): Promise<HomeFeed>;
+  get_friends(limit?: number): Promise<Friend[]>;
+  search_games(query: string): Promise<HomeGame[]>;
+
   // Games
   get_game_info(placeId: number): Promise<GameInfo | null>;
   get_servers(placeId: number, limit?: number): Promise<GameServer[]>;
   launch_game(placeId: number, jobId?: string | null): Promise<LaunchResult>;
 
   // Utility
-  get_roblox_path(): Promise<string | null>;
   is_roblox_installed(): Promise<boolean>;
 }
 

@@ -1,4 +1,4 @@
-import type { PyWebviewApi, User, GameInfo, GameServer, LoginResult, LaunchResult } from './types';
+import type { PyWebviewApi, User, GameInfo, GameServer, LoginResult, LaunchResult, HomeFeed, Friend, HomeGame } from './types';
 
 /**
  * Wait for pywebview API to be ready
@@ -30,8 +30,7 @@ export function getApi(): PyWebviewApi {
   return window.pywebview.api;
 }
 
-// Convenience wrapper functions
-
+// Auth
 export async function isLoggedIn(): Promise<boolean> {
   const api = await waitForApi();
   return api.is_logged_in();
@@ -52,6 +51,23 @@ export async function getCurrentUser(): Promise<User | null> {
   return api.get_current_user();
 }
 
+// Home Feed
+export async function getHomeFeed(): Promise<HomeFeed> {
+  const api = await waitForApi();
+  return api.get_home_feed();
+}
+
+export async function getFriends(limit: number = 20): Promise<Friend[]> {
+  const api = await waitForApi();
+  return api.get_friends(limit);
+}
+
+export async function searchGames(query: string): Promise<HomeGame[]> {
+  const api = await waitForApi();
+  return api.search_games(query);
+}
+
+// Games
 export async function getGameInfo(placeId: number): Promise<GameInfo | null> {
   const api = await waitForApi();
   return api.get_game_info(placeId);
@@ -67,6 +83,7 @@ export async function launchGame(placeId: number, jobId?: string | null): Promis
   return api.launch_game(placeId, jobId ?? null);
 }
 
+// Utility
 export async function isRobloxInstalled(): Promise<boolean> {
   const api = await waitForApi();
   return api.is_roblox_installed();
