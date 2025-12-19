@@ -97,7 +97,6 @@ export default function HomePage({ user, onLogout }: HomePageProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<HomeGame[]>([]);
-  const [searching, setSearching] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -121,14 +120,11 @@ export default function HomePage({ user, onLogout }: HomePageProps) {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
-    setSearching(true);
     try {
       const results = await searchGames(searchQuery);
       setSearchResults(results);
     } catch {
       // ignore
-    } finally {
-      setSearching(false);
     }
   };
 
